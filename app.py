@@ -4,13 +4,6 @@ import requests
 from streamlit_folium import st_folium
 import folium
 
-# Initialize session state for coordinates
-if "pickup_coords" not in st.session_state:
-    st.session_state.pickup_coords = None
-
-if "dropoff_coords" not in st.session_state:
-    st.session_state.dropoff_coords = None
-
 # Title of the app
 st.title("🚕 Taxi Fare Predictor Deluxe 🚀")
 st.subheader("Where are you heading today?")
@@ -20,80 +13,64 @@ st.markdown("### Select your pickup and drop-off locations on the map:")
 map_center = [40.7831, -73.9712]  # NYC center
 map_ = folium.Map(location=map_center, zoom_start=12)
 
-# Add existing markers to the map if set
-if st.session_state.pickup_coords:
-    folium.Marker(
-        location=st.session_state.pickup_coords,
-        popup="Pickup Location",
-        icon=folium.Icon(color="green"),
-    ).add_to(map_)
-
-if st.session_state.dropoff_coords:
-    folium.Marker(
-        location=st.session_state.dropoff_coords,
-        popup="Dropoff Location",
-        icon=folium.Icon(color="red"),
-    ).add_to(map_)
-
-# Add map click functionality
-map_.add_child(folium.ClickForMarker(popup="Click to set location"))
+# Add markers for user selection
+folium.Marker(location=map_center, popup="Default Pickup Location", draggable=False).add_to(map_)
 
 # Display the map and get user-selected data
 location_data = st_folium(map_, width=700, height=500)
 
-# Handle pickup and dropoff logic based on map clicks
-if location_data and "last_clicked" in location_data and location_data["last_clicked"]:
-    clicked_coords = location_data["last_clicked"]
+# Default pickup and dropoff coordinates (in case of no interaction)
+pickup_coords = map_center
+dropoff_coords = map_center
 
-    if clicked_coords and isinstance(clicked_coords, list) and len(clicked_coords) == 2:
-        if st.session_state.pickup_coords is None:
-            st.session_state.pickup_coords = [clicked_coords[0], clicked_coords[1]]
-            st.success(f"Pickup location set to: {st.session_state.pickup_coords}")
-        elif st.session_state.dropoff_coords is None:
-            st.session_state.dropoff_coords = [clicked_coords[0], clicked_coords[1]]
-            st.success(f"Dropoff location set to: {st.session_state.dropoff_coords}")
+# Handle pickup coordinates from map interaction safely
+if location_data:
+    if "last_clicked" in location_data and location_data["last_clicked"]:
+        pickup_coords = location_data["last_clicked"].get("lat_lng", map_center)
 
-# Ensure only valid coordinates are processed
-if st.session_state.pickup_coords and st.session_state.dropoff_coords:
-    st.markdown("### Route Details")
-    pickup = st.session_state.pickup_coords
-    dropoff = st.session_state.dropoff_coords
+# Allow user to enter dropoff coordinates if needed
+st.markdown("### Fine-tune your locations below:")
+pickup_longitude = st.number_input("Pickup Longitude", value=pickup_coords[1])
+pickup_latitude = st.number_input("Pickup Latitude", value=pickup_coords[0])
+dropoff_longitude = st.number_input("Drop-off Longitude", value=-73.9857)
+dropoff_latitude = st.number_input("Drop-off Latitude", value=40.7488)
 
-    # Call Mapbox Directions API
-    MAPBOX_ACCESS_TOKEN = "sk.eyJ1IjoiZ29udGlqbyIsImEiOiJjbTNzdXozNDYwMXUwMmxwY2V6YTlqN3A1In0.V01IDqMkfmgyB4Q0I7582g"
-    directions_url = f"https://api.mapbox.com/directions/v5/mapbox/driving/{pickup[1]},{pickup[0]};{dropoff[1]},{dropoff[0]}"
-    params = {"access_token": MAPBOX_ACCESS_TOKEN, "geometries": "geojson"}
-    response = requests.get(directions_url, params=params)
+# Input fields for date, time, and passenger count
+pickup_date = st.date_input("📅 Enter date:", value=datetime.date.today())
+pickup_time = st.time_input("⏰ Select the pickup time:", value=datetime.datetime.now().time())
+passenger_count = st.slider("👥 Number of passengers:", min_value=1, max_value=6, value=1)
 
-    if response.status_code == 200:
-        route_data = response.json()
-        route_geometry = route_data["routes"][0]["geometry"]["coordinates"]
+# Combine date and time into a single datetime string
+pickup_datetime = datetime.datetime.combine(pickup_date, pickup_time).strftime("%Y-%m-%d %H:%M:%S")
 
-        # Add route to the map
-        folium.PolyLine(
-            locations=[list(reversed(coord)) for coord in route_geometry],
-            color="blue",
-            weight=5,
-            opacity=0.8,
-        ).add_to(map_)
-        st_folium(map_, width=700, height=500)
+# Dynamic fare estimate button
+if st.button("✨ Get Your Funky Fare ✨"):
+    # Build the dictionary for the API call
+    params = {
+        "pickup_datetime": pickup_datetime,
+        "pickup_longitude": pickup_longitude,
+        "pickup_latitude": pickup_latitude,
+        "dropoff_longitude": dropoff_longitude,
+        "dropoff_latitude": dropoff_latitude,
+        "passenger_count": passenger_count
+    }
 
-        # Predict the fare
-        pickup_datetime = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        passenger_count = st.slider("👥 Number of passengers:", min_value=1, max_value=6, value=1)
-        prediction_params = {
-            "pickup_datetime": pickup_datetime,
-            "pickup_longitude": pickup[1],
-            "pickup_latitude": pickup[0],
-            "dropoff_longitude": dropoff[1],
-            "dropoff_latitude": dropoff[0],
-            "passenger_count": passenger_count,
-        }
-        fare_response = requests.get("https://taxifare.lewagon.ai/predict", params=prediction_params)
-        fare_response.raise_for_status()
-        fare_prediction = fare_response.json()
+    # Define the API endpoint
+    url = 'https://taxifare.lewagon.ai/predict'
 
+    try:
+        # Call the API
+        response = requests.get(url, params=params, timeout=30)
+        response.raise_for_status()
+        prediction = response.json()
+
+        # Display the prediction
         st.markdown("### 🤑 Your Estimated Fare is:")
-        st.write(f"**${fare_prediction['fare']:.2f}**")
-    else:
-        st.error("Failed to retrieve route details. Please try again.")
+        st.write(f"**${prediction['fare']:.2f}**")
+
+        # Fun add-ons: emoji and dynamic fun facts
+        st.markdown("🚀 **Did you know?** Taxi fares in NYC are highest during peak hours!")
+
+    except requests.exceptions.RequestException as e:
+        st.error("Error connecting to the prediction API.")
+        st.error(str(e))
