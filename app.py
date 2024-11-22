@@ -42,7 +42,7 @@ map_.add_child(folium.ClickForMarker(popup="Click to set location"))
 location_data = st_folium(map_, width=700, height=500)
 
 # Handle pickup and dropoff logic based on map clicks
-if location_data and "last_clicked" in location_data:
+if location_data and "last_clicked" in location_data and location_data["last_clicked"]:
     clicked_coords = location_data["last_clicked"]
 
     if clicked_coords and isinstance(clicked_coords, list) and len(clicked_coords) == 2:
@@ -52,10 +52,8 @@ if location_data and "last_clicked" in location_data:
         elif st.session_state.dropoff_coords is None:
             st.session_state.dropoff_coords = [clicked_coords[0], clicked_coords[1]]
             st.success(f"Dropoff location set to: {st.session_state.dropoff_coords}")
-    else:
-        st.error("Invalid coordinates. Please click again.")
 
-# Display route and calculate the taxi fare
+# Ensure only valid coordinates are processed
 if st.session_state.pickup_coords and st.session_state.dropoff_coords:
     st.markdown("### Route Details")
     pickup = st.session_state.pickup_coords
