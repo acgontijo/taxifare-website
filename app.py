@@ -27,14 +27,20 @@ if "dropoff_coords" not in st.session_state:
     st.session_state["dropoff_coords"] = None
 
 # Check for map clicks to capture coordinates
-if location_data and "last_clicked" in location_data:
-    clicked_coords = location_data["last_clicked"]
-    if st.session_state["pickup_coords"] is None:
-        st.session_state["pickup_coords"] = clicked_coords
-        st.success("Pickup location selected!")
-    elif st.session_state["dropoff_coords"] is None:
-        st.session_state["dropoff_coords"] = clicked_coords
-        st.success("Dropoff location selected!")
+if location_data and "last_active_drawing" in location_data:
+    if location_data["last_active_drawing"] and "geometry" in location_data["last_active_drawing"]:
+        if not pickup_set:
+            pickup = location_data["last_active_drawing"]["geometry"]["coordinates"]
+            pickup_set = True
+            st.success("Pickup location set!")
+        else:
+            dropoff = location_data["last_active_drawing"]["geometry"]["coordinates"]
+            st.success("Dropoff location set!")
+            # Make sure to validate the coordinates
+            if len(pickup) == 2 and len(dropoff) == 2:
+                route_url = f"https://api.mapbox.com/directions/v5/mapbox/driving/{pickup[1]},{pickup[0]};{dropoff[1]},{dropoff[0]}"
+            else:
+                st.error("Invalid coordinates for pickup or dropoff!")
 
 # Show selected pickup and dropoff
 if st.session_state["pickup_coords"]:
