@@ -5,45 +5,46 @@ from streamlit_folium import st_folium
 import folium
 
 # Title of the app
-st.title("Taxi Fare Prediction with Interactive Map")
+st.title("🚕 Taxi Fare Predictor Deluxe 🚀")
+st.subheader("Where are you heading today?")
 
-# Input fields for the user
-st.subheader("Select ride parameters")
+# Map for Pickup and Drop-off
+st.markdown("### Select your pickup and drop-off locations on the map:")
+map_center = [40.7831, -73.9712]  # NYC center
+map_ = folium.Map(location=map_center, zoom_start=12)
 
-# Set a default map center (New York City)
-map_center = [40.7128, -74.0060]
+# Add markers for user selection
+pickup_marker = folium.Marker(location=map_center, draggable=True, popup="Pickup Location")
+dropoff_marker = folium.Marker(location=map_center, draggable=True, popup="Dropoff Location")
+pickup_marker.add_to(map_)
+dropoff_marker.add_to(map_)
 
-# Initialize map
-m = folium.Map(location=map_center, zoom_start=12)
+# Display the map and get user-selected data
+location_data = st_folium(map_, width=700, height=500)
+pickup_coords = location_data["last_active_drawing"]["geometry"]["coordinates"] if "last_active_drawing" in location_data else map_center
+dropoff_coords = location_data["last_active_drawing"]["geometry"]["coordinates"] if "last_active_drawing" in location_data else map_center
 
-# Add drawing capabilities to the map
-folium.Marker(location=map_center, tooltip="Default pickup location").add_to(m)
+pickup_longitude, pickup_latitude = pickup_coords[0], pickup_coords[1]
+dropoff_longitude, dropoff_latitude = dropoff_coords[0], dropoff_coords[1]
 
-# Render the map in Streamlit
-location_data = st_folium(m, width=700, height=500)
-
-# Handle pickup coordinates from map interaction
-pickup_coords = map_center  # Default value
+# Retrieve location data from the map widget
+pickup_coords = map_center  # Default value in case "last_active_drawing" is not found
 
 if location_data and "last_active_drawing" in location_data:
+    # Ensure the key exists and contains the required data
     if location_data["last_active_drawing"] and "geometry" in location_data["last_active_drawing"]:
         pickup_coords = location_data["last_active_drawing"]["geometry"].get("coordinates", map_center)
 
-# Extract pickup latitude and longitude from coordinates
-pickup_longitude, pickup_latitude = pickup_coords
-
-# Additional inputs for the user
-dropoff_longitude = st.number_input("Drop-off Longitude", value=-73.9857)
-dropoff_latitude = st.number_input("Drop-off Latitude", value=40.7488)
-pickup_date = st.date_input("Enter date", value=datetime.date.today())
-pickup_time = st.time_input("Select the pickup time", value=datetime.datetime.now().time())
-passenger_count = st.number_input("Enter passenger count", min_value=1, max_value=10, value=1)
+# Input fields for date, time, and passenger count
+pickup_date = st.date_input("📅 Enter date:", value=datetime.date.today())
+pickup_time = st.time_input("⏰ Select the pickup time:", value=datetime.datetime.now().time())
+passenger_count = st.slider("👥 Number of passengers:", min_value=1, max_value=6, value=1)
 
 # Combine date and time into a single datetime string
 pickup_datetime = datetime.datetime.combine(pickup_date, pickup_time).strftime("%Y-%m-%d %H:%M:%S")
 
-# Add a button to trigger the prediction
-if st.button("Get Fare Prediction"):
+# Dynamic fare estimate button
+if st.button("✨ Get Your Funky Fare ✨"):
     # Build the dictionary for the API call
     params = {
         "pickup_datetime": pickup_datetime,
@@ -57,16 +58,14 @@ if st.button("Get Fare Prediction"):
     # Define the API endpoint
     url = 'https://taxifare.lewagon.ai/predict'
 
-    try:
-        # Call the API
-        response = requests.get(url, params=params, timeout=30)
-        response.raise_for_status()
-        prediction = response.json()
+    # Call the API
+    response = requests.get(url, params=params, timeout=30)
+    response.raise_for_status()
+    prediction = response.json()
 
-        # Display the prediction
-        st.subheader("Predicted Fare:")
-        st.write(f"${prediction['fare']:.2f}")
+    # Display the prediction
+    st.markdown("### 🤑 Your Estimated Fare is:")
+    st.write(f"**${prediction['fare']:.2f}**")
 
-    except requests.exceptions.RequestException as e:
-        st.error("Error connecting to the prediction API.")
-        st.error(str(e))
+    # Fun add-ons: emoji and dynamic fun facts
+    st.markdown("🚀 **Did you know?** Taxi fares in NYC are highest during peak hours!")
