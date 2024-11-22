@@ -39,16 +39,45 @@ map_.add_child(folium.ClickForMarker(popup="Click to set location"))
 # Display the map and get user-selected data
 location_data = st_folium(map_, width=700, height=500)
 
+# Map for Pickup and Drop-off
+st.markdown("### Select your pickup and drop-off locations on the map:")
+map_center = [40.7831, -73.9712]  # NYC center
+map_ = folium.Map(location=map_center, zoom_start=12)
+
+# Add existing markers to the map if set
+if st.session_state.pickup_coords:
+    folium.Marker(
+        location=st.session_state.pickup_coords,
+        popup="Pickup Location",
+        icon=folium.Icon(color="green"),
+    ).add_to(map_)
+
+if st.session_state.dropoff_coords:
+    folium.Marker(
+        location=st.session_state.dropoff_coords,
+        popup="Dropoff Location",
+        icon=folium.Icon(color="red"),
+    ).add_to(map_)
+
+# Add map click functionality
+map_.add_child(folium.ClickForMarker(popup="Click to set location"))
+
+# Display the map and get user-selected data
+location_data = st_folium(map_, width=700, height=500)
+
 # Handle pickup and dropoff logic based on map clicks
 if location_data and "last_clicked" in location_data:
     clicked_coords = location_data["last_clicked"]
-    if st.session_state.pickup_coords is None:
-        st.session_state.pickup_coords = clicked_coords
-        st.success(f"Pickup location set to: {st.session_state.pickup_coords}")
-    elif st.session_state.dropoff_coords is None:
-        st.session_state.dropoff_coords = clicked_coords
-        st.success(f"Dropoff location set to: {st.session_state.dropoff_coords}")
 
+    if clicked_coords and isinstance(clicked_coords, list) and len(clicked_coords) == 2:
+        if st.session_state.pickup_coords is None:
+            st.session_state.pickup_coords = [clicked_coords[0], clicked_coords[1]]
+            st.success(f"Pickup location set to: {st.session_state.pickup_coords}")
+        elif st.session_state.dropoff_coords is None:
+            st.session_state.dropoff_coords = [clicked_coords[0], clicked_coords[1]]
+            st.success(f"Dropoff location set to: {st.session_state.dropoff_coords}")
+    else:
+        st.error("Invalid coordinates. Please click again.")
 # Input fields for date, time, and passenger count
 pickup_date = st.date_input("📅 Enter date:", value=datetime.date.today())
 pickup_time = st.time_input("⏰ Select the pickup time:", value=datetime.datetime.now().time())
