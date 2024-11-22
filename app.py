@@ -1,25 +1,42 @@
 import datetime
 import streamlit as st
 import requests
+from streamlit_folium import st_folium
+import folium
 
 # Title of the app
-st.title("Taxi Fare Model Prediction")
-st.subheader("Select ride parameters")
+st.title("🚕 Taxi Fare Predictor Deluxe 🚀")
+st.subheader("Where are you heading today?")
 
-# Input fields for the user
-pickup_date = st.date_input("Enter date", value=datetime.date.today())
-pickup_time = st.time_input("Select the pickup time", value=datetime.datetime.now().time())
-pickup_longitude = st.number_input("Pickup Longitude")
-pickup_latitude = st.number_input("Pickup Latitude")
-dropoff_longitude = st.number_input("Drop-off Longitude")
-dropoff_latitude = st.number_input("Drop-off Latitude")
-passenger_count = st.number_input("Enter passenger count", min_value=1, max_value=10, value=1)
+# Map for Pickup and Drop-off
+st.markdown("### Select your pickup and drop-off locations on the map:")
+map_center = [40.7831, -73.9712]  # NYC center
+map_ = folium.Map(location=map_center, zoom_start=12)
+
+# Add markers for user selection
+pickup_marker = folium.Marker(location=map_center, draggable=True, popup="Pickup Location")
+dropoff_marker = folium.Marker(location=map_center, draggable=True, popup="Dropoff Location")
+pickup_marker.add_to(map_)
+dropoff_marker.add_to(map_)
+
+# Display the map and get user-selected data
+location_data = st_folium(map_, width=700, height=500)
+pickup_coords = location_data["last_active_drawing"]["geometry"]["coordinates"] if "last_active_drawing" in location_data else map_center
+dropoff_coords = location_data["last_active_drawing"]["geometry"]["coordinates"] if "last_active_drawing" in location_data else map_center
+
+pickup_longitude, pickup_latitude = pickup_coords[0], pickup_coords[1]
+dropoff_longitude, dropoff_latitude = dropoff_coords[0], dropoff_coords[1]
+
+# Input fields for date, time, and passenger count
+pickup_date = st.date_input("📅 Enter date:", value=datetime.date.today())
+pickup_time = st.time_input("⏰ Select the pickup time:", value=datetime.datetime.now().time())
+passenger_count = st.slider("👥 Number of passengers:", min_value=1, max_value=6, value=1)
 
 # Combine date and time into a single datetime string
 pickup_datetime = datetime.datetime.combine(pickup_date, pickup_time).strftime("%Y-%m-%d %H:%M:%S")
 
-# Add a button to trigger the prediction
-if st.button("Get Fare Prediction"):
+# Dynamic fare estimate button
+if st.button("✨ Get Your Funky Fare ✨"):
     # Build the dictionary for the API call
     params = {
         "pickup_datetime": pickup_datetime,
@@ -39,5 +56,8 @@ if st.button("Get Fare Prediction"):
     prediction = response.json()
 
     # Display the prediction
-    st.subheader("Predicted Fare:")
-    st.write(f"${prediction['fare']}")
+    st.markdown("### 🤑 Your Estimated Fare is:")
+    st.write(f"**${prediction['fare']:.2f}**")
+
+    # Fun add-ons: emoji and dynamic fun facts
+    st.markdown("🚀 **Did you know?** Taxi fares in NYC are highest during peak hours!")
