@@ -14,26 +14,26 @@ map_center = [40.7831, -73.9712]  # NYC center
 map_ = folium.Map(location=map_center, zoom_start=12)
 
 # Add markers for user selection
-pickup_marker = folium.Marker(location=map_center, draggable=True, popup="Pickup Location")
-dropoff_marker = folium.Marker(location=map_center, draggable=True, popup="Dropoff Location")
-pickup_marker.add_to(map_)
-dropoff_marker.add_to(map_)
+folium.Marker(location=map_center, popup="Default Pickup Location", draggable=False).add_to(map_)
 
 # Display the map and get user-selected data
 location_data = st_folium(map_, width=700, height=500)
-pickup_coords = location_data["last_active_drawing"]["geometry"]["coordinates"] if "last_active_drawing" in location_data else map_center
-dropoff_coords = location_data["last_active_drawing"]["geometry"]["coordinates"] if "last_active_drawing" in location_data else map_center
 
-pickup_longitude, pickup_latitude = pickup_coords[0], pickup_coords[1]
-dropoff_longitude, dropoff_latitude = dropoff_coords[0], dropoff_coords[1]
+# Default pickup and dropoff coordinates (in case of no interaction)
+pickup_coords = map_center
+dropoff_coords = map_center
 
-# Retrieve location data from the map widget
-pickup_coords = map_center  # Default value in case "last_active_drawing" is not found
+# Handle pickup coordinates from map interaction safely
+if location_data:
+    if "last_clicked" in location_data and location_data["last_clicked"]:
+        pickup_coords = location_data["last_clicked"].get("lat_lng", map_center)
 
-if location_data and "last_active_drawing" in location_data:
-    # Ensure the key exists and contains the required data
-    if location_data["last_active_drawing"] and "geometry" in location_data["last_active_drawing"]:
-        pickup_coords = location_data["last_active_drawing"]["geometry"].get("coordinates", map_center)
+# Allow user to enter dropoff coordinates if needed
+st.markdown("### Fine-tune your locations below:")
+pickup_longitude = st.number_input("Pickup Longitude", value=pickup_coords[1])
+pickup_latitude = st.number_input("Pickup Latitude", value=pickup_coords[0])
+dropoff_longitude = st.number_input("Drop-off Longitude", value=-73.9857)
+dropoff_latitude = st.number_input("Drop-off Latitude", value=40.7488)
 
 # Input fields for date, time, and passenger count
 pickup_date = st.date_input("📅 Enter date:", value=datetime.date.today())
@@ -58,14 +58,19 @@ if st.button("✨ Get Your Funky Fare ✨"):
     # Define the API endpoint
     url = 'https://taxifare.lewagon.ai/predict'
 
-    # Call the API
-    response = requests.get(url, params=params, timeout=30)
-    response.raise_for_status()
-    prediction = response.json()
+    try:
+        # Call the API
+        response = requests.get(url, params=params, timeout=30)
+        response.raise_for_status()
+        prediction = response.json()
 
-    # Display the prediction
-    st.markdown("### 🤑 Your Estimated Fare is:")
-    st.write(f"**${prediction['fare']:.2f}**")
+        # Display the prediction
+        st.markdown("### 🤑 Your Estimated Fare is:")
+        st.write(f"**${prediction['fare']:.2f}**")
 
-    # Fun add-ons: emoji and dynamic fun facts
-    st.markdown("🚀 **Did you know?** Taxi fares in NYC are highest during peak hours!")
+        # Fun add-ons: emoji and dynamic fun facts
+        st.markdown("🚀 **Did you know?** Taxi fares in NYC are highest during peak hours!")
+
+    except requests.exceptions.RequestException as e:
+        st.error("Error connecting to the prediction API.")
+        st.error(str(e))
